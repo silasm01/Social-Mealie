@@ -89,8 +89,13 @@ def process_video(video_url, video_id):
         
         if platform == 'tiktok':
             video_data = pk.save_tiktok(video_url, True, return_fns=True, metadata_fn="metadata.csv")
+            print(video_data)
             video = video_data["video_fn"]
             extracted_comments = pd.read_csv("metadata.csv")["video_description"].to_list()[0]
+            
+            meta = requests.get(f"https://www.tiktok.com/oembed?url={video_url}").json()
+            thumbnail_url = meta.get("thumbnail_url", "")
+            print("Thumbnail URL:", thumbnail_url)
         else:  # Instagram
             video, extracted_comments = download_instagram_reel(video_url, temp_dir)
         
@@ -207,7 +212,8 @@ def process_video(video_url, video_id):
                             4. Any implied step even if not spoken
 
                             Be concise and factual.
-                            Also note any text present in the image."""
+                            Also note any text present in the image.
+                        """
                         },
                         {
                             "type": "input_image",
@@ -225,7 +231,7 @@ def process_video(video_url, video_id):
             
             for future in as_completed(futures):
                 responses.append(future.result())
-                yield {"video_id": video_id, "status": "processing", "message": f"Analyzed {len(responses)}/{len(frames)} frames"}
+                yield {"video_id": video_id, "status": "processing", "message": f"Analyzed {len(responses)}/{len(frames)} frames."}
         
         # Generate final recipe
         yield {"video_id": video_id, "status": "generating", "message": "Generating final recipe..."}
@@ -270,6 +276,8 @@ JSON ONLY. """
         
         recipe_json = json.loads(recipe_json)
         
+        print("Final Recipe JSON generated.")
+        
         # Send to external API
         try:
             x = requests.post(
@@ -280,10 +288,25 @@ JSON ONLY. """
                 },
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb25nX3Rva2VuIjp0cnVlLCJpZCI6IjZmYmQ2NmRhLTRjMzctNGQyMS1hZWQ3LWE0ODQxZWUxYTJhZiIsIm5hbWUiOiJBSSIsImludGVncmF0aW9uX2lkIjoiZ2VuZXJpYyIsImV4cCI6MTkyNjM0MDgzM30.2tQMCXW8D6CqKPl2t4lu_epIcyMxd2ENHALwBQtmANU"
+                    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb25nX3Rva2VuIjp0cnVlLCJpZCI6IjM5MzY1ZWUwLTMxNjYtNDBmZC1iMzc4LTM5YzY2YWIzYzYzZiIsIm5hbWUiOiJhaSIsImludGVncmF0aW9uX2lkIjoiZ2VuZXJpYyIsImV4cCI6MTkyNjM2NDcyMn0.7-yZj-DA46xzJSg0zSIu7Vn9DOsCOcel59nbq3t-OLU"
                 }
             )
             api_response = x.text
+            
+            slug = recipe_json["name"].lower().replace(" ", "-")
+            
+            y = requests.post(
+                f"http://100.70.0.50:9925/api/recipes/{slug}/image",
+                json={
+                    "includeTags": True,
+                    "url": thumbnail_url
+                },
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb25nX3Rva2VuIjp0cnVlLCJpZCI6IjM5MzY1ZWUwLTMxNjYtNDBmZC1iMzc4LTM5YzY2YWIzYzYzZiIsIm5hbWUiOiJhaSIsImludGVncmF0aW9uX2lkIjoiZ2VuZXJpYyIsImV4cCI6MTkyNjM2NDcyMn0.7-yZj-DA46xzJSg0zSIu7Vn9DOsCOcel59nbq3t-OLU"
+                }   
+            )
+            print("Image upload response:", y.text)
         except Exception as e:
             api_response = f"Error posting to API: {str(e)}"
         
@@ -332,4 +355,4 @@ def process():
     return app.response_class(generate(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000, extra_files=["./"])

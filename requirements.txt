@@ -1,0 +1,8 @@
+flask
+openai
+opencv-python
+pyktok
+pandas
+requests
+instaloader
+python-dotenv

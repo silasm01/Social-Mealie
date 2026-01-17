@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  recipe-extractor:
+    # Option 1: Use pre-built image from GitHub Container Registry
+    # Uncomment the line below and replace YOUR_USERNAME with your GitHub username
+    # image: ghcr.io/YOUR_USERNAME/recipe-extractor:latest
+    
+    # Option 2: Use pre-built image from Docker Hub
+    # Uncomment the line below and replace YOUR_USERNAME with your Docker Hub username
+    # image: YOUR_USERNAME/recipe-extractor:latest
+    
+    # Option 3: Build locally (default)
+    build: .
+    
+    container_name: recipe-extractor
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+      # Add your OpenAI API key here for production
+      - OPENAI_API_KEY=your_openai_api_key_here
+    volumes:
+      # Mount a volume for temporary files (optional)
+      - /tmp/recipe-extractor:/tmp
+    restart: unless-stopped
+    # Optional: Set resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G

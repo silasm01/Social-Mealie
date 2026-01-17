@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recipe Extractor - TikTok & Instagram</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      background: #f5f7fa;
+      min-height: 100vh;
+      padding: 20px;
+      color: #2c3e50;
+    }
+
+    .header {
+      max-width: 1200px;
+      margin: 0 auto 30px;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 600;
+      color: #1a202c;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    .header p {
+      color: #64748b;
+      font-size: 15px;
+      font-weight: 400;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .control-panel {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .input-section {
+      margin-bottom: 20px;
+    }
+
+    .input-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 12px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 15px;
+      transition: all 0.2s;
+      background: #ffffff;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    input[type="text"]::placeholder {
+      color: #9ca3af;
+    }
+
+    button {
+      padding: 12px 24px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background: #2563eb;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .info-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 14px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+
+    .info-box strong {
+      color: #374151;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .info-box ul {
+      margin-left: 20px;
+      margin-top: 8px;
+    }
+
+    .info-box li {
+      margin-bottom: 4px;
+    }
+
+    .videos-section {
+      margin-top: 24px;
+    }
+
+    .section-header {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1a202c;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .videos-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .video-item {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      overflow: hidden;
+      transition: all 0.2s;
+    }
+
+    .video-item:hover {
+      border-color: #cbd5e1;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .video-header {
+      padding: 16px 20px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fafafa;
+      border-bottom: 1px solid #e2e8f0;
+      user-select: none;
+    }
+
+    .video-header:hover {
+      background: #f5f5f5;
+    }
+
+    .video-title {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .video-expand-icon {
+      color: #9ca3af;
+      font-size: 14px;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+
+    .video-item.expanded .video-expand-icon {
+      transform: rotate(90deg);
+    }
+
+    .video-url-display {
+      font-size: 14px;
+      color: #374151;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .video-status-badge {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+
+    .video-status-badge.queued {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .video-status-badge.downloading,
+    .video-status-badge.processing,
+    .video-status-badge.analyzing,
+    .video-status-badge.generating {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .video-status-badge.complete {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .video-status-badge.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .video-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out;
+    }
+
+    .video-item.expanded .video-content {
+      max-height: 2000px;
+    }
+
+    .video-content-inner {
+      padding: 20px;
+      background: white;
+    }
+
+    .status-message {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #374151;
+    }
+
+    .loader {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 50%;
+      border-top-color: #3b82f6;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .progress-log {
+      margin-top: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 13px;
+      color: #64748b;
+      background: #f8fafc;
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .progress-log div {
+      padding: 4px 0;
+      line-height: 1.5;
+    }
+
+    .recipe-output {
+      margin-top: 16px;
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 16px;
+      border-radius: 8px;
+      max-height: 500px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      border: 1px solid #334155;
+    }
+
+    .recipe-output::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .recipe-output::-webkit-scrollbar-track {
+      background: #0f172a;
+      border-radius: 4px;
+    }
+
+    .recipe-output::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #94a3b8;
+    }
+
+    .empty-state-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state p {
+      font-size: 15px;
+    }
+
+    @media (max-width: 768px) {
+      .input-group {
+        flex-direction: column;
+      }
+
+      button {
+        width: 100%;
+      }
+
+      .header h1 {
+        font-size: 24px;
+      }
+
+      .control-panel {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <h1>Recipe Extractor</h1>
+    <p>Extract recipes from TikTok and Instagram Reels using AI</p>
+  </div>
+
+  <div class="container">
+    <div class="control-panel">
+      <div class="input-section">
+        <label class="input-label">Video URL</label>
+        <div class="input-group">
+          <input type="text" id="videoUrl" placeholder="Paste TikTok or Instagram Reels URL here..." />
+          <button id="processBtn" onclick="addVideo()">Add Video</button>
+        </div>
+      </div>
+
+      <div class="info-box">
+        <strong>Supported Platforms</strong>
+        <ul>
+          <li>TikTok cooking videos</li>
+          <li>Instagram Reels</li>
+        </ul>
+        <p style="margin-top: 12px;">Add multiple videos to process them simultaneously. Click on each video card to
+          expand and view progress.</p>
+      </div>
+    </div>
+
+    <div class="videos-section">
+      <div class="section-header">
+        <span>Processing Queue</span>
+      </div>
+      <div class="videos-list" id="videosList">
+        <div class="empty-state">
+          <div class="empty-state-icon">📋</div>
+          <p>No videos in queue. Add a video URL above to get started.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const activeVideos = new Map();
+
+    function addVideo() {
+      const input = document.getElementById('videoUrl');
+      const url = input.value.trim();
+
+      if (!url) {
+        alert('Please enter a TikTok or Instagram Reels video URL');
+        return;
+      }
+
+      // Clear input
+      input.value = '';
+
+      // Start processing
+      startVideoProcessing(url);
+    }
+
+    function startVideoProcessing(url) {
+      fetch('/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: url })
+      }).then(response => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        function readStream() {
+          reader.read().then(({ done, value }) => {
+            if (done) {
+              return;
+            }
+
+            const text = decoder.decode(value);
+            const lines = text.split('\n');
+
+            lines.forEach(line => {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.substring(6));
+                  handleUpdate(data);
+                } catch (e) {
+                  console.error('Error parsing SSE data:', e);
+                }
+              }
+            });
+
+            readStream();
+          });
+        }
+
+        readStream();
+      }).catch(error => {
+        console.error('Error starting video processing:', error);
+        alert('Error: ' + error.message);
+      });
+    }
+
+    function handleUpdate(data) {
+      const videoId = data.video_id;
+
+      if (!activeVideos.has(videoId)) {
+        // Create new video item
+        createVideoItem(videoId, data);
+      } else {
+        // Update existing video item
+        updateVideoItem(videoId, data);
+      }
+    }
+
+    function createVideoItem(videoId, data) {
+      const videosList = document.getElementById('videosList');
+
+      // Remove empty state if it exists
+      const emptyState = videosList.querySelector('.empty-state');
+      if (emptyState) {
+        emptyState.remove();
+      }
+
+      // Create video item
+      const videoItem = document.createElement('div');
+      videoItem.className = 'video-item expanded';
+      videoItem.id = `video-${videoId}`;
+
+      const shortUrl = data.url ? data.url.substring(0, 50) + (data.url.length > 50 ? '...' : '') : 'Processing...';
+
+      videoItem.innerHTML = `
+        <div class="video-header" onclick="toggleVideo('${videoId}')">
+          <div class="video-title">
+            <span class="video-expand-icon">▶</span>
+            <span class="video-url-display">${shortUrl}</span>
+          </div>
+          <span class="video-status-badge ${data.status}">${data.status}</span>
+        </div>
+        <div class="video-content">
+          <div class="video-content-inner">
+            <div class="status-message"></div>
+            <div class="progress-log"></div>
+            <div class="recipe-output" style="display: none;"></div>
+          </div>
+        </div>
+      `;
+
+      // Prepend to list (newest first)
+      videosList.insertBefore(videoItem, videosList.firstChild);
+
+      // Track video
+      activeVideos.set(videoId, {
+        element: videoItem,
+        url: data.url,
+        status: data.status
+      });
+
+      // Update with initial data
+      updateVideoItem(videoId, data);
+    }
+
+    function updateVideoItem(videoId, data) {
+      const videoData = activeVideos.get(videoId);
+      if (!videoData) return;
+
+      const videoItem = videoData.element;
+      const statusBadge = videoItem.querySelector('.video-status-badge');
+      const statusMessage = videoItem.querySelector('.status-message');
+      const progressLog = videoItem.querySelector('.progress-log');
+      const recipeOutput = videoItem.querySelector('.recipe-output');
+
+      // Update status badge
+      statusBadge.className = `video-status-badge ${data.status}`;
+      statusBadge.textContent = data.status;
+
+      // Update status message
+      if (data.status === 'complete') {
+        statusMessage.innerHTML = '✓ ' + data.message;
+
+        if (data.recipe) {
+          recipeOutput.textContent = data.recipe;
+          recipeOutput.style.display = 'block';
+        }
+
+        if (data.api_response) {
+          const apiDiv = document.createElement('div');
+          apiDiv.style.marginTop = '10px';
+          apiDiv.style.padding = '10px';
+          apiDiv.style.background = '#fff3cd';
+          apiDiv.style.borderRadius = '5px';
+          apiDiv.innerHTML = '<strong>API Response:</strong><br>' + data.api_response;
+          progressLog.appendChild(apiDiv);
+        }
+      } else if (data.status === 'error') {
+        statusMessage.innerHTML = '✗ ' + data.message;
+      } else {
+        statusMessage.innerHTML = '<span class="loader"></span>' + data.message;
+
+        const logEntry = document.createElement('div');
+        logEntry.textContent = '• ' + data.message;
+        progressLog.appendChild(logEntry);
+        progressLog.scrollTop = progressLog.scrollHeight;
+      }
+
+      // Update tracked status
+      videoData.status = data.status;
+    }
+
+    function toggleVideo(videoId) {
+      const videoItem = document.getElementById(`video-${videoId}`);
+      if (videoItem) {
+        videoItem.classList.toggle('expanded');
+      }
+    }
+
+    // Allow Enter key to submit
+    document.getElementById('videoUrl').addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        addVideo();
+      }
+    });
+  </script>
+</body>
+
+</html>

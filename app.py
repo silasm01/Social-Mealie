@@ -22,6 +22,10 @@ app = Flask(__name__)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# Mealie configuration
+MEALIE_URL = os.getenv("MEALIE_URL", "http://localhost:9925")
+MEALIE_TOKEN = os.getenv("MEALIE_TOKEN", "")
+
 def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
@@ -281,14 +285,14 @@ JSON ONLY. """
         # Send to external API
         try:
             x = requests.post(
-                "http://100.70.0.50:9925/api/recipes/create/html-or-json",
+                f"{MEALIE_URL}/api/recipes/create/html-or-json",
                 json={
                     "includeTags": True,
                     "data": json.dumps(recipe_json)
                 },
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb25nX3Rva2VuIjp0cnVlLCJpZCI6IjM5MzY1ZWUwLTMxNjYtNDBmZC1iMzc4LTM5YzY2YWIzYzYzZiIsIm5hbWUiOiJhaSIsImludGVncmF0aW9uX2lkIjoiZ2VuZXJpYyIsImV4cCI6MTkyNjM2NDcyMn0.7-yZj-DA46xzJSg0zSIu7Vn9DOsCOcel59nbq3t-OLU"
+                    "Authorization": f"Bearer {MEALIE_TOKEN}"
                 }
             )
             api_response = x.text
@@ -296,14 +300,14 @@ JSON ONLY. """
             slug = recipe_json["name"].lower().replace(" ", "-")
             
             y = requests.post(
-                f"http://100.70.0.50:9925/api/recipes/{slug}/image",
+                f"{MEALIE_URL}/api/recipes/{slug}/image",
                 json={
                     "includeTags": True,
                     "url": thumbnail_url
                 },
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb25nX3Rva2VuIjp0cnVlLCJpZCI6IjM5MzY1ZWUwLTMxNjYtNDBmZC1iMzc4LTM5YzY2YWIzYzYzZiIsIm5hbWUiOiJhaSIsImludGVncmF0aW9uX2lkIjoiZ2VuZXJpYyIsImV4cCI6MTkyNjM2NDcyMn0.7-yZj-DA46xzJSg0zSIu7Vn9DOsCOcel59nbq3t-OLU"
+                    "Authorization": f"Bearer {MEALIE_TOKEN}"
                 }   
             )
             print("Image upload response:", y.text)

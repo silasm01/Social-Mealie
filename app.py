@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 import base64
 from openai import OpenAI
 import os
@@ -15,6 +15,7 @@ import uuid
 import re
 import instaloader
 from dotenv import load_dotenv
+import sys
 
 load_dotenv()
 
@@ -353,10 +354,15 @@ def process():
     def generate():
         # Send initial event with video_id
         yield f"data: {json.dumps({'video_id': video_id, 'status': 'queued', 'message': 'Video queued for processing', 'url': video_url})}\n\n"
+        sys.stdout.flush()
         for update in process_video(video_url, video_id):
             yield f"data: {json.dumps(update)}\n\n"
+            sys.stdout.flush()
     
-    return app.response_class(generate(), mimetype='text/event-stream')
+    response = Response(generate(), mimetype='text/event-stream')
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['X-Accel-Buffering'] = 'no'
+    return response
 
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=5000, extra_files=["./"])
+    app.run(debug=False, host='0.0.0.0', port=5000, threaded=True)

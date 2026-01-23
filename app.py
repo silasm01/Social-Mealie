@@ -298,6 +298,8 @@ JSON ONLY. """
             )
             api_response = x.text
             
+            print("API response:", api_response)
+            
             slug = recipe_json["name"].lower().replace(" ", "-")
             
             y = requests.post(

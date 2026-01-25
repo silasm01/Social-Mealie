@@ -92,6 +92,8 @@ def process_video(video_url, video_id):
         original_dir = os.getcwd()
         os.chdir(temp_dir)
         
+        thumbnail_url = ""  # Initialize for both platforms
+        
         if platform == 'tiktok':
             video_data = pk.save_tiktok(video_url, True, return_fns=True, metadata_fn="metadata.csv")
             print(video_data)
@@ -103,6 +105,8 @@ def process_video(video_url, video_id):
             print("Thumbnail URL:", thumbnail_url)
         else:  # Instagram
             video, extracted_comments = download_instagram_reel(video_url, temp_dir)
+            # Instagram doesn't provide a direct thumbnail URL from the API
+            thumbnail_url = ""
         
         yield {"video_id": video_id, "status": "processing", "message": f"Video downloaded: {os.path.basename(video)}"}
         yield {"video_id": video_id, "status": "processing", "message": f"Extracted description: {extracted_comments}"}
@@ -284,7 +288,10 @@ JSON ONLY. """
         print("Final Recipe JSON generated.")
         
         # Send to external API
+        api_response = "Recipe generated but not uploaded to Mealie"
         try:
+            yield {"video_id": video_id, "status": "uploading", "message": f"Uploading recipe to Mealie at {MEALIE_URL}..."}
+            
             x = requests.post(
                 f"{MEALIE_URL}/api/recipes/create/html-or-json",
                 json={
@@ -294,28 +301,63 @@ JSON ONLY. """
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {MEALIE_TOKEN}"
-                }
-            )
-            api_response = x.text
-            
-            print("API response:", api_response)
-            
-            slug = recipe_json["name"].lower().replace(" ", "-")
-            
-            y = requests.post(
-                f"{MEALIE_URL}/api/recipes/{slug}/image",
-                json={
-                    "includeTags": True,
-                    "url": thumbnail_url
                 },
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {MEALIE_TOKEN}"
-                }   
+                timeout=30
             )
-            print("Image upload response:", y.text)
+            
+            print(f"Recipe upload status: {x.status_code}")
+            print(f"Recipe upload response: {x.text}")
+            
+            if x.status_code in [200, 201]:
+                api_response = f"Recipe uploaded successfully (Status: {x.status_code})"
+                yield {"video_id": video_id, "status": "uploading", "message": "Recipe uploaded successfully!"}
+                
+                # Upload thumbnail if available
+                if thumbnail_url:
+                    try:
+                        slug = recipe_json["name"].lower().replace(" ", "-")
+                        yield {"video_id": video_id, "status": "uploading", "message": "Uploading recipe thumbnail..."}
+                        
+                        y = requests.post(
+                            f"{MEALIE_URL}/api/recipes/{slug}/image",
+                            json={
+                                "includeTags": True,
+                                "url": thumbnail_url
+                            },
+                            headers={
+                                "Content-Type": "application/json",
+                                "Authorization": f"Bearer {MEALIE_TOKEN}"
+                            },
+                            timeout=30
+                        )
+                        print(f"Image upload status: {y.status_code}")
+                        print(f"Image upload response: {y.text}")
+                        
+                        if y.status_code in [200, 201]:
+                            yield {"video_id": video_id, "status": "uploading", "message": "Thumbnail uploaded successfully!"}
+                        else:
+                            yield {"video_id": video_id, "status": "uploading", "message": f"Thumbnail upload failed (Status: {y.status_code})"}
+                    except Exception as img_error:
+                        print(f"Image upload error: {str(img_error)}")
+                        yield {"video_id": video_id, "status": "uploading", "message": f"Thumbnail upload error: {str(img_error)}"}
+                else:
+                    yield {"video_id": video_id, "status": "uploading", "message": "No thumbnail available for this video"}
+            else:
+                api_response = f"Error uploading recipe (Status: {x.status_code}): {x.text}"
+                yield {"video_id": video_id, "status": "error", "message": f"Recipe upload failed: {api_response}"}
+                
+        except requests.exceptions.Timeout:
+            api_response = f"Timeout connecting to Mealie at {MEALIE_URL}"
+            print(f"API Error: {api_response}")
+            yield {"video_id": video_id, "status": "error", "message": api_response}
+        except requests.exceptions.ConnectionError as e:
+            api_response = f"Connection error to Mealie at {MEALIE_URL}: {str(e)}"
+            print(f"API Error: {api_response}")
+            yield {"video_id": video_id, "status": "error", "message": f"Cannot connect to Mealie. Check MEALIE_URL and network settings."}
         except Exception as e:
             api_response = f"Error posting to API: {str(e)}"
+            print(f"API Error: {api_response}")
+            yield {"video_id": video_id, "status": "error", "message": api_response}
         
         yield {
             "video_id": video_id,

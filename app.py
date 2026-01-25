@@ -286,11 +286,15 @@ JSON ONLY. """
         recipe_json = json.loads(recipe_json)
         
         print("Final Recipe JSON generated.")
+        print(f"Attempting to upload to Mealie URL: {MEALIE_URL}")
+        print(f"Using token: {MEALIE_TOKEN[:20]}..." if MEALIE_TOKEN else "No token set")
         
         # Send to external API
         api_response = "Recipe generated but not uploaded to Mealie"
         try:
+            print("Starting recipe upload...")
             yield {"video_id": video_id, "status": "uploading", "message": f"Uploading recipe to Mealie at {MEALIE_URL}..."}
+            sys.stdout.flush()
             
             x = requests.post(
                 f"{MEALIE_URL}/api/recipes/create/html-or-json",
@@ -350,15 +354,21 @@ JSON ONLY. """
             api_response = f"Timeout connecting to Mealie at {MEALIE_URL}"
             print(f"API Error: {api_response}")
             yield {"video_id": video_id, "status": "error", "message": api_response}
+            sys.stdout.flush()
         except requests.exceptions.ConnectionError as e:
             api_response = f"Connection error to Mealie at {MEALIE_URL}: {str(e)}"
             print(f"API Error: {api_response}")
             yield {"video_id": video_id, "status": "error", "message": f"Cannot connect to Mealie. Check MEALIE_URL and network settings."}
+            sys.stdout.flush()
         except Exception as e:
             api_response = f"Error posting to API: {str(e)}"
             print(f"API Error: {api_response}")
+            import traceback
+            traceback.print_exc()
             yield {"video_id": video_id, "status": "error", "message": api_response}
+            sys.stdout.flush()
         
+        print(f"Final API response: {api_response}")
         yield {
             "video_id": video_id,
             "status": "complete",
@@ -366,8 +376,13 @@ JSON ONLY. """
             "recipe": json.dumps(recipe_json, indent=2),
             "api_response": api_response
         }
+        sys.stdout.flush()
+        print("Process completed successfully")
         
     except Exception as e:
+        print(f"FATAL ERROR in process_video: {str(e)}")
+        import traceback
+        traceback.print_exc()
         yield {
             "video_id": video_id,
             "status": "error",

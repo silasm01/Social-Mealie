@@ -27,6 +27,9 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 MEALIE_URL = os.getenv("MEALIE_URL", "http://localhost:9925")
 MEALIE_TOKEN = os.getenv("MEALIE_TOKEN", "")
 
+# Output language configuration
+OUTPUT_LANGUAGE = os.getenv("OUTPUT_LANGUAGE", "English")
+
 def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
@@ -264,6 +267,7 @@ Audio transcription segments:
 
 REQUIREMENTS
 ------------
+- Text should be in {OUTPUT_LANGUAGE}
 - Output valid JSON only
 - Use Schema.org Recipe
 - Do not hallucinate information not in the inputs. Especially for ingredients and quantities and times that where not specified.

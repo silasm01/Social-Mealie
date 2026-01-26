@@ -27,6 +27,8 @@ services:
       - MEALIE_URL=http://mealie:9925
       - MEALIE_TOKEN=your_mealie_token_here
     volumes:
+      # Persist database outside container
+      - recipe-extractor-data:/app/instance
       # Mount a volume for temporary files (optional)
       - /tmp/recipe-extractor:/tmp
     restart: unless-stopped
@@ -39,3 +41,6 @@ services:
         reservations:
           cpus: '1'
           memory: 2G
+
+volumes:
+  recipe-extractor-data:

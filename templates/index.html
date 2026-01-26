@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recipe Extractor - TikTok & Instagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       --bg-primary: #f5f7fa;
@@ -92,6 +93,7 @@
 
     .theme-toggle {
       position: fixed;
+      width: auto;
       top: 20px;
       right: 20px;
       background: var(--bg-secondary);
@@ -108,6 +110,16 @@
     .theme-toggle:hover {
       transform: scale(1.05);
       box-shadow: var(--shadow-md);
+    }
+
+    .user-info-corner {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      z-index: 1000;
     }
 
     .container {
@@ -382,6 +394,17 @@
       line-height: 1.5;
     }
 
+    .chart-container-user {
+      position: relative;
+      height: 300px;
+      margin: 20px 0;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-primary);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+
     .recipe-output {
       margin-top: 16px;
       background: var(--bg-code);
@@ -449,8 +472,24 @@
 
 <body>
   <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode">
-    <span id="themeIcon">🌙</span>
+    <span id="themeIcon">☀</span>
   </button>
+
+  <div class="user-info-corner">
+    <span style="background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 6px; font-size: 14px;">
+      {{ user_name }}
+    </span>
+    {% if session.get('is_admin') %}
+    <a href="/admin"
+      style="background: rgba(255,215,0,0.3); padding: 6px 12px; border-radius: 6px; font-size: 14px; text-decoration: none; color: inherit;">
+      Admin
+    </a>
+    {% endif %}
+    <a href="/logout"
+      style="background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 6px; font-size: 14px; text-decoration: none; color: inherit;">
+      Logout
+    </a>
+  </div>
 
   <div class="header">
     <h1>Recipe Extractor</h1>
@@ -484,9 +523,18 @@
       </div>
       <div class="videos-list" id="videosList">
         <div class="empty-state">
-          <div class="empty-state-icon">📋</div>
+          <div class="empty-state-icon">□</div>
           <p>No videos in queue. Add a video URL above to get started.</p>
         </div>
+      </div>
+    </div>
+
+    <div class="videos-section">
+      <div class="section-header">
+        <span>Your Usage - Last 30 Days</span>
+      </div>
+      <div class="chart-container-user">
+        <canvas id="userDailyUsageChart"></canvas>
       </div>
     </div>
   </div>
@@ -502,14 +550,14 @@
       localStorage.setItem('theme', newTheme);
 
       // Update icon
-      document.getElementById('themeIcon').textContent = newTheme === 'dark' ? '☀️' : '🌙';
+      document.getElementById('themeIcon').textContent = newTheme === 'dark' ? '☀' : '☾';
     }
 
     // Load saved theme on page load
     function loadTheme() {
       const savedTheme = localStorage.getItem('theme') || 'light';
       document.documentElement.setAttribute('data-theme', savedTheme);
-      document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+      document.getElementById('themeIcon').textContent = savedTheme === 'dark' ? '☀' : '☾';
     }
 
     // Load theme immediately
@@ -694,6 +742,84 @@
         addVideo();
       }
     });
+
+    // Initialize user usage chart
+    async function initializeUserChart() {
+      try {
+        const response = await fetch('/api/daily-usage?days=30');
+        const dailyData = await response.json();
+
+        if (!dailyData || dailyData.length === 0) {
+          return; // No data to display
+        }
+
+        const dates = dailyData.map(d => d.date);
+        const costs = dailyData.map(d => d.cost || 0);
+        const tokens = dailyData.map(d => d.tokens || 0);
+
+        const ctx = document.getElementById('userDailyUsageChart').getContext('2d');
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: dates,
+            datasets: [
+              {
+                label: 'Tokens Used',
+                data: tokens,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true,
+                pointRadius: 4,
+                pointBackgroundColor: '#3b82f6',
+                yAxisID: 'y'
+              },
+              {
+                label: 'Cost (DKK)',
+                data: costs,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true,
+                pointRadius: 4,
+                pointBackgroundColor: '#10b981',
+                yAxisID: 'y1'
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: true }
+            },
+            scales: {
+              y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: { display: true, text: 'Tokens' }
+              },
+              y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: { display: true, text: 'Cost (DKK)' },
+                grid: { drawOnChartArea: false }
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error loading user chart:', error);
+      }
+    }
+
+    // Initialize chart when page loads
+    document.addEventListener('DOMContentLoaded', initializeUserChart);
   </script>
 </body>
 

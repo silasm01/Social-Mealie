@@ -27,8 +27,8 @@ services:
       - MEALIE_URL=http://mealie:9925
       - MEALIE_TOKEN=your_mealie_token_here
     volumes:
-      # Persist database outside container
-      - recipe-extractor-data:/app/instance
+      # Persist database on host machine - stores in ./instance folder
+      - ./instance:/app/instance
       # Mount a volume for temporary files (optional)
       - /tmp/recipe-extractor:/tmp
     restart: unless-stopped
@@ -42,5 +42,3 @@ services:
           cpus: '1'
           memory: 2G
 
-volumes:
-  recipe-extractor-data:

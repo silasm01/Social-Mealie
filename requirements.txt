@@ -5,4 +5,5 @@ pyktok
 pandas
 requests
 instaloader
-python-dotenvwerkzeug
+python-dotenv
+werkzeug

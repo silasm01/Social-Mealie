@@ -387,6 +387,38 @@ def persist_frame_files(video_id, temp_dir, frame_refs):
         if os.path.exists(source_path) and not os.path.exists(dest_path):
             shutil.copy2(source_path, dest_path)
 
+
+def sanitize_recipe_images(obj):
+    """Remove any invalid image values so Mealie only sees valid URLs."""
+    if isinstance(obj, dict):
+        if 'image' in obj:
+            image_value = obj['image']
+            if not isinstance(image_value, str) or not re.match(r'^https?://', image_value.strip()):
+                obj.pop('image', None)
+        for value in obj.values():
+            sanitize_recipe_images(value)
+    elif isinstance(obj, list):
+        for item in obj:
+            sanitize_recipe_images(item)
+
+
+def find_first_valid_image_url(obj):
+    """Return the first valid http(s) image URL found in a recipe object."""
+    if isinstance(obj, dict):
+        if 'image' in obj and isinstance(obj['image'], str) and re.match(r'^https?://', obj['image'].strip()):
+            return obj['image'].strip()
+        for value in obj.values():
+            result = find_first_valid_image_url(value)
+            if result:
+                return result
+    elif isinstance(obj, list):
+        for item in obj:
+            result = find_first_valid_image_url(item)
+            if result:
+                return result
+    return None
+
+
 def replace_frame_image_references(obj, video_id, base_url):
     """Replace frame_<n> markers in recipe JSON with actual served image URLs."""
     if not base_url:
@@ -720,6 +752,11 @@ JSON ONLY. """
         recipe_json = json.loads(recipe_json)
         frame_refs = get_frame_references(recipe_json)
         replace_frame_image_references(recipe_json, video_id, frame_server_base_url)
+        sanitize_recipe_images(recipe_json)
+        if 'image' not in recipe_json or not recipe_json['image']:
+            first_image = find_first_valid_image_url(recipe_json)
+            if first_image:
+                recipe_json['image'] = first_image
         persist_frame_files(video_id, temp_dir, frame_refs)
         
         print("Final Recipe JSON generated.")

@@ -617,7 +617,7 @@ def process_video(video_url, video_id, user_id, frame_server_base_url=None):
         yield {"video_id": video_id, "status": "processing", "message": "Analyzing video frames..."}
         
         def process_frame(i, frame):
-            temp_path = os.path.join(temp_dir, f"temp_frame_{i}.jpg")
+            temp_path = os.path.join(temp_dir, f"frame_{i}.jpg")
             cv2.imwrite(temp_path, frame)
             base64_image = encode_image(temp_path)
             # os.remove(temp_path)
@@ -693,9 +693,9 @@ REQUIREMENTS
 - Output valid JSON only
 - Use Schema.org Recipe
 - Do not hallucinate information not in the inputs. Especially for ingredients and quantities and times that where not specified.
-- Analyze whether a step would benefit from a image. This is passed by frame analysis. (IMPORTANT NOT EVERYTHING NEEDS AN IMAGE. ONLY IMPORTANT NON QUANTATIVE STEPS)
+- Analyze whether a step would benefit from a image. This is passed by frame analysis. (IMPORTANT NOT EVERYTHING NEEDS AN IMAGE)
 - Include:
-  name, description, recipeIngredient, recipeInstructions, image if relevant for step
+  name, description, recipeIngredient, recipeInstructions, image if relevant for step (But at most one for each step)
 - Use HowToStep for instructions
 - Use ISO 8601 durations (PT#M)
 - Do not include unsupported fields

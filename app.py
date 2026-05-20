@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, jsonify, Response, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, Response, session, redirect, url_for, send_file
 import base64
 from openai import OpenAI
 import os
+from urllib.parse import urljoin
 import cv2
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
@@ -349,12 +350,46 @@ def detect_platform(url):
     else:
         return 'unknown'
 
+# Keep temp frame directories for active video uploads so Mealie can fetch frame URLs
+active_frame_dirs = {}
+
+def replace_frame_image_references(obj, video_id, base_url):
+    """Replace frame_<n> markers in recipe JSON with actual served image URLs."""
+    if not base_url:
+        raise ValueError("frame_server_base_url is required")
+
+    if isinstance(obj, dict):
+        for key, value in list(obj.items()):
+            if key == 'image' and isinstance(value, str):
+                match = re.match(r'^frame_(\d+)(?:\.jpg)?$', value.strip())
+                if match:
+                    frame_name = match.group(0)
+                    obj[key] = urljoin(base_url, f"frame/{video_id}/{frame_name}.jpg")
+            else:
+                replace_frame_image_references(value, video_id, base_url)
+    elif isinstance(obj, list):
+        for item in obj:
+            replace_frame_image_references(item, video_id, base_url)
+
+@app.route('/frame/<video_id>/<frame_name>.jpg')
+def serve_frame(video_id, frame_name):
+    """Serve saved extracted frame images while the recipe is being uploaded."""
+    temp_dir = active_frame_dirs.get(video_id)
+    if not temp_dir:
+        return jsonify({'error': 'Frame not available'}), 404
+
+    file_path = os.path.join(temp_dir, f"{frame_name}.jpg")
+    if not os.path.exists(file_path):
+        return jsonify({'error': 'Frame not found'}), 404
+
+    return send_file(file_path, mimetype='image/jpeg')
+
 def download_instagram_reel(url, temp_dir):
     """Download Instagram Reel and return video path and caption"""
     L = instaloader.Instaloader(dirname_pattern=temp_dir)
     
     # Extract shortcode from URL
-    shortcode_match = re.search(r'/reel/([^/?]+)', url)
+    shortcode_match = re.search(r'/reels/([^/?]+)', url)
     if not shortcode_match:
         shortcode_match = re.search(r'/p/([^/?]+)', url)
     
@@ -382,10 +417,11 @@ def download_instagram_reel(url, temp_dir):
     
     return video_file, caption
 
-def process_video(video_url, video_id, user_id):
+def process_video(video_url, video_id, user_id, frame_server_base_url=None):
     """Process a TikTok or Instagram Reel video URL and return the recipe"""
     responses = []
     temp_dir = tempfile.mkdtemp()
+    active_frame_dirs[video_id] = temp_dir
     
     # Accumulator for tokens used across all API calls
     token_accumulator = {}
@@ -496,8 +532,13 @@ def process_video(video_url, video_id, user_id):
         # Extract and transcribe audio
         yield {"video_id": video_id, "status": "processing", "message": "Extracting and transcribing audio..."}
         audio_path = os.path.join(temp_dir, "extracted_audio.wav")
+        # Resolve ffmpeg executable at runtime to avoid FileNotFoundError
+        ffmpeg_path = shutil.which("ffmpeg")
+        if not ffmpeg_path:
+            raise RuntimeError("ffmpeg not found. Install ffmpeg and add it to PATH: https://ffmpeg.org/download.html")
+
         subprocess.run([
-            'ffmpeg', '-i', video,
+            ffmpeg_path, '-i', video,
             '-vn',
             '-acodec', 'pcm_s16le',
             '-ar', '16000',
@@ -543,7 +584,7 @@ def process_video(video_url, video_id, user_id):
             temp_path = os.path.join(temp_dir, f"temp_frame_{i}.jpg")
             cv2.imwrite(temp_path, frame)
             base64_image = encode_image(temp_path)
-            os.remove(temp_path)
+            # os.remove(temp_path)
             
             response = client.responses.create(
                 model="gpt-4.1-mini",
@@ -559,6 +600,7 @@ def process_video(video_url, video_id, user_id):
                             2. Which ingredients are involved
                             3. Cooking method (heat, tool, motion)
                             4. Any implied step even if not spoken
+                            5. At last say if any important visual clues such as caramalization or brownness of stuff is shown that is important to show the user. (Eg. salting og straight forward tasks like washing should not be included as they are straight forward)
 
                             Be concise and factual.
                             Also note any text present in the image.
@@ -615,8 +657,9 @@ REQUIREMENTS
 - Output valid JSON only
 - Use Schema.org Recipe
 - Do not hallucinate information not in the inputs. Especially for ingredients and quantities and times that where not specified.
+- Analyze whether a step would benefit from a image. This is passed by frame analysis. (IMPORTANT NOT EVERYTHING NEEDS AN IMAGE. ONLY IMPORTANT NON QUANTATIVE STEPS)
 - Include:
-  name, description, recipeIngredient, recipeInstructions
+  name, description, recipeIngredient, recipeInstructions, image if relevant for step
 - Use HowToStep for instructions
 - Use ISO 8601 durations (PT#M)
 - Do not include unsupported fields
@@ -639,6 +682,7 @@ JSON ONLY. """
             recipe_json = recipe_json[1:-1]
         
         recipe_json = json.loads(recipe_json)
+        replace_frame_image_references(recipe_json, video_id, frame_server_base_url)
         
         print("Final Recipe JSON generated.")
         print(f"Attempting to upload to Mealie URL: {MEALIE_URL}")
@@ -750,6 +794,7 @@ JSON ONLY. """
     
     finally:
         os.chdir(original_dir)
+        active_frame_dirs.pop(video_id, None)
         try:
             shutil.rmtree(temp_dir)
         except:
@@ -787,12 +832,13 @@ def process():
     log_usage(user_id, video_url, 'started')
     
     video_id = str(uuid.uuid4())
+    base_url = request.host_url
     
     def generate():
         # Send initial event with video_id
         yield f"data: {json.dumps({'video_id': video_id, 'status': 'queued', 'message': 'Video queued for processing', 'url': video_url})}\n\n"
         sys.stdout.flush()
-        for update in process_video(video_url, video_id, user_id):
+        for update in process_video(video_url, video_id, user_id, base_url):
             yield f"data: {json.dumps(update)}\n\n"
             sys.stdout.flush()
     

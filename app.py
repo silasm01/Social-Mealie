@@ -350,8 +350,42 @@ def detect_platform(url):
     else:
         return 'unknown'
 
-# Keep temp frame directories for active video uploads so Mealie can fetch frame URLs
+"""Persistent frame storage for used frames."""
+FRAME_STORAGE_DIR = os.path.abspath(os.path.join('instance', 'frames'))
+os.makedirs(FRAME_STORAGE_DIR, exist_ok=True)
+
+# Keep temp frame directories for active video uploads so Mealie can fetch frame URLs while processing
 active_frame_dirs = {}
+
+def get_frame_references(obj):
+    """Return a set of referenced frame names found in recipe JSON."""
+    refs = set()
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if key == 'image' and isinstance(value, str):
+                match = re.match(r'^frame_(\d+)(?:\.jpg)?$', value.strip())
+                if match:
+                    refs.add(match.group(0))
+            else:
+                refs.update(get_frame_references(value))
+    elif isinstance(obj, list):
+        for item in obj:
+            refs.update(get_frame_references(item))
+    return refs
+
+def persist_frame_files(video_id, temp_dir, frame_refs):
+    """Persist only the referenced frame image files for later access."""
+    if not frame_refs:
+        return
+
+    dest_dir = os.path.join(FRAME_STORAGE_DIR, video_id)
+    os.makedirs(dest_dir, exist_ok=True)
+
+    for frame_name in frame_refs:
+        source_path = os.path.join(temp_dir, f"{frame_name}.jpg")
+        dest_path = os.path.join(dest_dir, f"{frame_name}.jpg")
+        if os.path.exists(source_path) and not os.path.exists(dest_path):
+            shutil.copy2(source_path, dest_path)
 
 def replace_frame_image_references(obj, video_id, base_url):
     """Replace frame_<n> markers in recipe JSON with actual served image URLs."""
@@ -375,10 +409,12 @@ def replace_frame_image_references(obj, video_id, base_url):
 def serve_frame(video_id, frame_name):
     """Serve saved extracted frame images while the recipe is being uploaded."""
     temp_dir = active_frame_dirs.get(video_id)
-    if not temp_dir:
-        return jsonify({'error': 'Frame not available'}), 404
+    if temp_dir:
+        temp_path = os.path.join(temp_dir, f"{frame_name}.jpg")
+        if os.path.exists(temp_path):
+            return send_file(temp_path, mimetype='image/jpeg')
 
-    file_path = os.path.join(temp_dir, f"{frame_name}.jpg")
+    file_path = os.path.join(FRAME_STORAGE_DIR, video_id, f"{frame_name}.jpg")
     if not os.path.exists(file_path):
         return jsonify({'error': 'Frame not found'}), 404
 
@@ -682,7 +718,9 @@ JSON ONLY. """
             recipe_json = recipe_json[1:-1]
         
         recipe_json = json.loads(recipe_json)
+        frame_refs = get_frame_references(recipe_json)
         replace_frame_image_references(recipe_json, video_id, frame_server_base_url)
+        persist_frame_files(video_id, temp_dir, frame_refs)
         
         print("Final Recipe JSON generated.")
         print(f"Attempting to upload to Mealie URL: {MEALIE_URL}")
